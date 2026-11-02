@@ -53,10 +53,11 @@ footer{text-align:center;color:var(--mut);font-size:11.5px;padding:10px 0 30px}
 .top{padding:12px 16px;-webkit-print-color-adjust:exact;print-color-adjust:exact}main{margin:10px auto;padding:0}
 .kpi,.card,th,tr.total td,.logo{-webkit-print-color-adjust:exact;print-color-adjust:exact;box-shadow:none}.card,.kpis,.charts{break-inside:avoid}
 .tw{max-height:none;overflow:visible}th{position:static}.in{border:0}.in span{background:none}.ph{display:block}}
+#hdeal{color:var(--gold);font-weight:600}.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--navy);color:#fff;padding:11px 18px;border-radius:9px;font-weight:600;font-size:13px;opacity:0;transition:.25s;z-index:99;box-shadow:0 8px 24px rgba(0,0,0,.25);pointer-events:none}.toast.on{opacity:1;transform:translateX(-50%)}
 </style></head><body>
 <div class="top"><div class="row">
-<div class="brand"><div class="logo">CFA</div><div><div class="eyebrow">Investment Underwriting</div><h1>Cash Flow Analysis</h1><p>15-year pro forma · single property · inputs save in this browser only</p></div></div>
-<div class="actions"><button class="b gold" onclick="window.print()">⎙ Print / PDF</button><button class="b" onclick="dlCSV()">⤓ CSV</button><a class="b" href="CFA_Template_Blank.xlsx" download>⤓ Blank .xlsx</a><button class="b" onclick="clearAll()">✕ Clear</button></div>
+<div class="brand"><div class="logo">CFA</div><div><div class="eyebrow">Investment Underwriting</div><h1>Cash Flow Analysis<span id="hdeal"></span></h1><p>15-year pro forma · single property · each shared link carries only its own deal</p></div></div>
+<div class="actions"><button class="b gold" onclick="shareDeal()">🔗 Share this deal</button><button class="b" onclick="newDeal()">＋ New blank deal</button><button class="b" id="rbtn" onclick="restoreDraft()" style="display:none">↺ Restore my last draft</button><button class="b" onclick="window.print()">⎙ Print / PDF</button><button class="b" onclick="dlCSV()">⤓ CSV</button><a class="b" href="CFA_Template_Blank.xlsx" download>⤓ Blank .xlsx</a><button class="b" onclick="clearAll()">✕ Clear</button></div>
 </div></div>
 <main>
 <div class="kpis">
@@ -72,6 +73,7 @@ footer{text-align:center;color:var(--mut);font-size:11.5px;padding:10px 0 30px}
 <div class="sec">Deal Inputs</div>
 <div class="grid">
 <div class="card"><h3><i>1</i>General</h3><div class="bd">
+<div class="f">Deal Name<div class="in t"><input id="deal" type="text" placeholder="e.g. Pine Lake Rd"></div></div>
 <div class="f">Prepared For<div class="in t"><input id="prep" type="text" placeholder="Client / investor"></div></div>
 <div class="f">Last Revision<div class="in t"><input id="rev" type="date"></div></div>
 <div class="f">Property<div class="in t"><input id="props" type="text" placeholder="Name / address"></div></div>
@@ -122,9 +124,9 @@ footer{text-align:center;color:var(--mut);font-size:11.5px;padding:10px 0 30px}
 <div class="tw"><table id="t"><thead><tr></tr></thead><tbody></tbody></table></div>
 <p class="hint">Income grows at the annual growth rate; vacancy is % of gross or vacant ÷ total units × gross; opex, property tax (% of price or flat $) and insurance stay flat. Debt service is PMT on the original loan for years 1–4 and on refinance terms from year 5 (using the year-5 ending balance); principal uses PPMT (original loan yrs 1–10, refinance yrs 11–15). Equity = purchase price − year-end loan balance. Click a header to sort; drag a header edge to resize.</p>
 </main>
-<footer>Cash Flow Analysis · For underwriting purposes only · Figures are estimates</footer>
+<div class="toast" id="toast"></div><footer>Cash Flow Analysis · For underwriting purposes only · Figures are estimates</footer>
 <script>
-const IDS=['prep','rev','props','ppu','y0','price','down','rate','amort','term','rrate','ramort','rterm','impr','dbasis','xbasis','xdbasis','life','taxm','tax','ins','vacm','vac','units','opex','reimb','p1','g'];
+const IDS=['deal','prep','rev','props','ppu','y0','price','down','rate','amort','term','rrate','ramort','rterm','impr','dbasis','xbasis','xdbasis','life','taxm','tax','ins','vacm','vac','units','opex','reimb','p1','g'];
 const $=id=>document.getElementById(id);const n=id=>{const v=parseFloat(String($(id).value).replace(/[$,%\s]/g,''));return isNaN(v)?0:v};
 const PMT=(r,k,pv)=>{if(!k)return 0;return r?-(pv*r*Math.pow(1+r,k))/(Math.pow(1+r,k)-1):-pv/k};
 const IPMT=(r,p,k,pv)=>{if(p===1)return -pv*r;const pm=PMT(r,k,pv);const fv=pv*Math.pow(1+r,p-1)+pm*(Math.pow(1+r,p-1)-1)/r;return -fv*r};
@@ -134,7 +136,8 @@ const COLS=['Year','Yr #','Gross Income','Vacancy','Annual Gross Income','Operat
 const PCT=new Set([13,17]);let rows=[],ch1,ch2;
 function kv(id,txt,neg){const e=$(id);e.textContent=txt;e.classList.toggle('neg',!!neg)}
 function calc(){
- IDS.forEach(i=>localStorage.setItem('cfaT_'+i,$(i).value));
+ const st=state();if(Object.keys(st).some(k=>!['y0','g','taxm','vacm'].includes(k)||!isDef(k,st[k])))localStorage.setItem('cfaT_draft',JSON.stringify(st));
+ const dn=$('deal').value.trim();$('hdeal').textContent=dn?' — '+dn:'';document.title=(dn?dn+' | ':'')+'CFA — Cash Flow Analysis';
  const price=n('price'),down=n('down'),loan=price-down,r=n('rate')/100,am=n('amort'),rr=n('rrate')/100,ram=n('ramort'),g=1+n('g')/100,y0=n('y0')||2026;
  const taxAmt=-Math.abs($('taxm').value==='pct'?price*n('tax')/100:n('tax')),ins=-Math.abs(n('ins')),vm=$('vacm').value,tu=n('units');$('unitsRow').style.display=vm==='units'?'':'none';
  const vacOf=gr=>vm==='units'?(tu?n('vac')/tu*gr:0):gr*n('vac')/100;
@@ -172,12 +175,27 @@ function charts(price){if(!window.Chart)return;const lb=rows.map(r=>r[0]);const 
 function dlCSV(){const q=s=>'"'+String(s).replace(/"/g,'""')+'"';let c='Prepared For,'+q($('prep').value)+'\nProperty,'+q($('props').value)+'\n'+COLS.map(q).join(',')+'\n';
  rows.forEach(r=>c+=r.map(v=>typeof v==='number'?v.toFixed(4):q(v)).join(',')+'\n');
  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([c],{type:'text/csv'}));a.download='CFA_'+($('prep').value||'blank').replace(/\W+/g,'_')+'.csv';a.click()}
-function clearAll(){if(!confirm('Clear all inputs?'))return;IDS.forEach(i=>{$(i).value=i==='y0'?'2026':i==='g'?'1':(i==='taxm'||i==='vacm')?'pct':''});calc()}
+const DEF={y0:'2026',g:'1',taxm:'pct',vacm:'pct'};const isDef=(k,v)=>(DEF[k]||'')===v;
+function state(){const o={};IDS.forEach(i=>{const v=$(i).value;if(!isDef(i,v))o[i]=v});return o}
+function blank(){IDS.forEach(i=>$(i).value=DEF[i]||'')}
+function apply(o){blank();Object.entries(o||{}).forEach(([k,v])=>{if(IDS.includes(k))$(k).value=v})}
+const enc=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+const dec=s=>JSON.parse(decodeURIComponent(escape(atob(s.replace(/-/g,'+').replace(/_/g,'/')))));
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('on'),2600)}
+function shareDeal(){const url=location.origin+location.pathname+'#d='+enc(state());history.replaceState(null,'',url);
+ const ok=()=>toast('Link copied — opens this deal only');
+ if(navigator.clipboard&&isSecureContext)navigator.clipboard.writeText(url).then(ok,()=>prompt('Copy this link:',url));else prompt('Copy this link:',url)}
+function newDeal(){history.replaceState(null,'',location.pathname);blank();calc();toast('New blank deal')}
+function restoreDraft(){try{apply(JSON.parse(localStorage.getItem('cfaT_draft')||'{}'));history.replaceState(null,'',location.pathname);calc();toast('Draft restored')}catch(e){}}
+function loadHash(){const m=location.hash.match(/^#d=(.+)$/);if(m){try{apply(dec(m[1]));return true}catch(e){toast('Invalid share link')}}blank();return false}
+function clearAll(){if(!confirm('Clear all inputs?'))return;newDeal()}
 const hr=$('t').tHead.rows[0];COLS.forEach((c,k)=>{const th=document.createElement('th');th.textContent=c;th.style.position='sticky';if(k<2)th.style.width=k?'64px':'84px';const h=document.createElement('span');h.className='rz';
  h.addEventListener('mousedown',e=>{e.preventDefault();e.stopPropagation();const x=e.clientX,w=th.offsetWidth;const mv=ev=>th.style.width=Math.max(50,w+ev.clientX-x)+'px';const up=()=>{removeEventListener('mousemove',mv);removeEventListener('mouseup',up)};addEventListener('mousemove',mv);addEventListener('mouseup',up)});
  h.addEventListener('click',e=>e.stopPropagation());th.appendChild(h);hr.appendChild(th)});
-IDS.forEach(i=>{const v=localStorage.getItem('cfaT_'+i);if(v!==null)$(i).value=v;$(i).addEventListener('input',calc);$(i).addEventListener('change',calc)});
+const fromLink=loadHash();if(!fromLink&&localStorage.getItem('cfaT_draft'))$('rbtn').style.display='';
+IDS.forEach(i=>{$(i).addEventListener('input',calc);$(i).addEventListener('change',calc)});
 calc();
+addEventListener('hashchange',()=>{loadHash();calc()});
 </script><!--SORTABLE-START--><script>
 /* Shared sortable tables (Grok Bot trackers). Click any header: asc/desc toggle with ▲/▼.
    Works on dynamically rendered tables via event delegation. Totals (tfoot, .total/.ft/.tot rows,
